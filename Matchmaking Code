@@ -1,0 +1,500 @@
+//////////////////////////////////// SETUP ///////////////////////////////////////
+var mentors = [];
+var mentor = {};
+
+var mentees = [];
+var mentee = {};
+
+var prefMentors = {};
+var prefMentees = {};
+
+  var mentorsMentees = {};
+
+var unpairedMentees = [];
+var pairedMentees = [];
+
+// var people = [];
+// var person = {};
+var numP = 27;
+
+  let tempMatches = {};
+
+var finalMatches = {};
+var finalMatchesInfo = "  MENTOR NAME: Mentee Names";
+
+let sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+// let headers = sheet.getRange('C1:E1').getValues();
+
+//////////////////////////////////// EXECUTABLE ///////////////////////////////////////
+
+function run(){
+  importData();
+  checkMatches();
+
+  // console.info(people);
+  // console.info(mentors);
+  // console.info(mentees);
+  
+  menteePairingPrefs();
+  mentorPairingPrefs();
+  matchAlg2();
+
+  
+
+  console.info("FINAL matches:");
+  console.info(finalMatchesInfo);
+  sendInfo();
+}
+
+
+
+//////////////////////////////////// FUNCTIONS ///////////////////////////////////////
+function sendInfo(){
+  let eSubject = "SAID Mentor Pairings Are Finally Here!!!"
+  /// FOR THE MENTORS
+  for(item of mentors){
+    let infoMessage = "";
+    let receiver = item.email;
+    let menteeInfo = [];
+    for(let i = 0; i < item.mentees.length; i++){
+      menteeIndex = mentees.indexOf(mentees.find(({name}) => name == item.mentees[i]));
+      let yourMentee = mentees[menteeIndex];
+      menteeInfo.push({
+        name: yourMentee.name,
+        pronouns: yourMentee.pronouns,
+        email: yourMentee.email,
+        phone: yourMentee.phone
+      })
+      let thisMentee = menteeInfo[i];
+      thisMentee.infoMessage = "\r"+thisMentee.name+"\'s personal info:\r  Pronouns: "+thisMentee.pronouns+"\r  Email: "+thisMentee.email+"\r  Phone: "+thisMentee.phone;  
+      infoMessage = infoMessage+"\r"+thisMentee.infoMessage;
+      // console.log(menteeInfo);
+    }
+    let firstName = item.name.split(" ")[0];
+    let eBody = "Thank you for signing up for SAID's mentorship program, "+firstName+"!\r\rWe are excited to finally announce this year's mentor/mentee pairings. Huge shout out to our former president Jared for writing a custom JavaScript algorithm to find the best pairings based on everyone's specified areas of interest and preferences. Everyone will be receiving a custom email with the info to get in touch with their mentor or mentees, so nobody's info will be shared unecessarily. So without further ado, here is the list of pairings\n\n"+finalMatchesInfo+"\r\rThank's again for signing up to be a mentor, we are very confident that you will be a huge support to your mentees. \rHere is the private contact info for your them:"+infoMessage+"\n\nWe have provided your contact info to your mentees, but we highly recommend you get in touch with them directly and introduce yourself over this week!\r\rBest wishes to everyone! If you have any questions or concerns, please do not hesitate to email SAID at said.ocad@gmail.com or send us a message to our Instagram @SAID_OCADu.\n\nThanks,\nSenthurri Thiruchenthooran\rCo-President, Student Association of Industrial Designers\r3rd Year\rs.thiruchenthooran@ocadu.ca";
+
+    console.log(receiver,eSubject,eBody);
+    MailApp.sendEmail("s.thiruchenthooran@ocadu.ca",eSubject,eBody);
+    
+  }
+
+  /// FOR THE MENTEES
+  for(item of mentees){
+    console.log(item);
+    let infoMessage = "";
+    let receiver = item.email;
+    let thisMentor = mentors.find(({name}) => name == item.mentor);
+    let mentorInfo = thisMentor;      
+    infoMessage = mentorInfo.name+"\'s personal info:\r  Pronouns: "+mentorInfo.pronouns+"\r  Email: "+mentorInfo.email+"\r  Phone: "+mentorInfo.phone;  
+    // console.log(infoMessage);
+    let firstName = item.name.split(" ")[0];
+    let eBody = "Thank you for signing up for SAID's mentorship program, "+firstName+"!\r\rWe are excited to finally announce this year's mentor/mentee pairings. Huge shout out to our former president Jared for writing a custom JavaScript algorithm to find the best mentor/mentee pairings based on everyone's specified areas of interest. Everyone will be receiving a custom email with the info to get in touch with their mentor or mentees, so nobody's info will be shared unecessarily. Without further ado, here is the list of pairings\r\r"+finalMatchesInfo+"\r\r  THAT MEANS YOUR MENTOR IS "+mentorInfo.name.toUpperCase()+"!!!\r\rThank's again for signing up to be a mentee, we hope that "+mentorInfo.name+" will be a huge support to you throughout this academic year. \rHere's their private contact info:\r\r"+infoMessage+"\r\rWe have also provided your contact info to your mentor so they should get in touch with you over this week.\r\rBest wishes to everyone! If you have any questions or concerns, please do not hesitate to email SAID at said.ocad@gmail.com or send us a message to our Instagram @SAID_OCADu.\r\rThanks,\rSenthurri Thiruchenthooran\rCo-President, Student Association of Industrial Designers\r3rd Year\rs.thiruchenthooran@ocadu.ca";
+
+    console.log(receiver,eSubject,eBody);
+    // MailApp.sendEmail(The REVEIVER,eSubject,eBody);
+  }
+}
+
+function menteePairingPrefs(){
+  for(let i = 0; i < mentees.length; i++){
+    let holdList = [];
+
+    for(let j = 0; j < mentees[i].mentorRanking.length; j++){
+      holdList.push(mentees[i].mentorRanking[j].name);
+    }
+    let name = mentees[i].name;
+    prefMentors[name] = holdList;
+  }
+
+  // console.info("Mentees' Preferences List:");
+  // console.info(prefMentors);
+}
+
+function mentorPairingPrefs(){
+  for(let i = 0; i < mentors.length; i++){
+    let holdList = [];
+
+    for(let j = 0; j < mentors[i].menteeRanking.length; j++){
+      holdList.push(mentors[i].menteeRanking[j].name);
+    }
+    let name = mentors[i].name;
+    prefMentees[name] = holdList;
+  }
+
+  // console.info("Mentors' Preferences List:");
+  // console.info(prefMentees);
+}
+
+
+
+
+
+function matchAlg2(){
+  // assign temporary pairings
+  pairingTest();
+
+  // test for duplicate mentees
+  dupTest();
+
+  console.info("Final matches after splicing duplicates:");
+  finalMatches = tempMatches;
+  console.info(finalMatches);
+  console.info("unpaired Mentees: "+unpairedMentees);
+  
+
+  while(unpairedMentees.length > mentees.length % mentors.length){
+    // console.info(unpairedMentees);
+    console.info("------------------------------------------------------------ RUNNING  AGAIN ------------------------------------------------------------------");
+    // matchAlg2();
+    rematch();
+    dupTest();
+
+    console.info("temporary matches:");
+    console.info(tempMatches);
+    console.info("unpaired mentees: "+unpairedMentees);
+  }
+
+  leftovers();
+  finalMatches = tempMatches;
+
+  for(let i = 0; i < mentors.length; i++){
+    let thisMentor = mentors[i].name;
+    mentors[i].mentees = finalMatches[thisMentor];
+
+    finalMatchesInfo = finalMatchesInfo+"\r  "+thisMentor.toUpperCase()+": "+String(finalMatches[thisMentor]).replace(',', ': ').replace(',', ', and ').replace(':', ', and');
+    // finalMatchesInfo = finalMatchesInfo+"\r  "+thisMentor.toUpperCase()+": "+String(finalMatches[thisMentor]).replace(',', ', ');
+  }
+  
+  
+  // let index = mentees.find(({name}) => name === unpairedMentees[0]);
+  // console.info(index);
+
+
+  // console.info(prefMentors[unpairedMentees[0]]);
+
+  // rematch();
+  // dupTest();
+  //   console.info(tempMatches);
+  //   console.info("unpaired mentees: "+unpairedMentees);
+}
+
+function leftovers(){
+  for(item of unpairedMentees){
+    let thisMentee = item;
+    let pref1;
+    for (let i = 0; i < 8; i++){
+      let mentorName = prefMentors[thisMentee][i];
+      let mentorCheck;
+      for (let j = 0; j < mentors.length; j++){
+        if(mentors[j].name == mentorName){
+          mentorCheck = j;
+          break;
+        }
+      }
+      if(mentors[mentorCheck].numMentees > 2){
+        pref1 = prefMentors[thisMentee][i];
+        console.log(pref1);
+        break;
+      }
+    }
+    
+
+    if(tempMatches[pref1].length < 3){
+      tempMatches[pref1].push(thisMentee);
+      console.log(thisMentee+" was added to "+pref1+"'s list")
+      mentees[mentees.indexOf(mentees.find(({name}) => name == thisMentee))].mentor = pref1; // assign mentor to this mentees[].mentor
+    }
+    // } else {
+    //   tempMatches[pref2].push(thisMentee);
+    //   mentees[mentees.indexOf(mentees.find(({name}) => name == thisMentee))].mentor = pref2; // assign mentor to this mentees[].mentor
+    // }
+  }
+  console.log("--------------------------------------------------------------------------");
+  console.log("               !!!!!!!!    ALL MATCHES COMPLETE    !!!!!!!!               ");
+  console.log("--------------------------------------------------------------------------");
+
+}
+
+function rematch(){
+   console.log("");
+  console.log("__________________REMATCHING_______________________")
+  for(let i = 0; i < mentors.length; i++){
+    let name = mentors[i].name;
+    let thisMentor = tempMatches[name];
+    let tempList = thisMentor;
+    
+    console.log(name+"s preferred mentees are "+prefMentees[name])
+    console.log("    Current Matches: "+thisMentor);
+
+    for(let j = 0; j < mentees.length; j++){
+      let thisMentee = prefMentees[name][j];
+      let x = unpairedMentees.indexOf(thisMentee);
+      if(tempList.length < 2 && x >= 0){
+          // unpairedMentees.splice[x]; 
+        console.log(thisMentee+" is unpaired. at index: "+x+". Pairing with "+name) 
+        tempList.push(thisMentee);
+      } 
+    }
+
+    // for(let j = thisMentor.length-1; j < 3; j++){
+    //   let thisMentee = prefMentees[name][j];
+    //   // (unpairedMentees.indexOf(thisMentee) >= 0) ? unpairedMentees.splice[unpairedMentees.indexOf(thisMentee)] : false;
+    //   let x = unpairedMentees.indexOf(thisMentee);
+    //   if(x >= 0){ 
+    //     unpairedMentees.splice[x]; 
+    //     console.log(thisMentee+" is unpaired. index: "+x) 
+    //   }
+    //     // tempList.push(thisMentee);
+    // }
+
+    thisMentor = tempList;
+    console.info(thisMentor);
+    // console.info(mentors[i])
+  }
+  console.info(tempMatches)
+}
+
+function pairingTest(){
+ console.log("");
+  console.log("__________________PAIRING TEST_______________________")
+
+  for(let i = 0; i < mentors.length; i++){
+    let name = mentors[i].name;
+    // if(!tempMatches[name]){tempMatches[name] = [];}
+    !tempMatches[name] ? tempMatches[name] = [] : false;
+    let tempList = [];
+    for(let j = tempMatches[name].length; j < 2; j++){
+      tempList.push(prefMentees[name][j])
+    }
+    tempMatches[name] = tempList;
+    console.info(tempMatches[name]);
+    console.info(mentors[i].name)
+  }
+  console.info("temporary matches:");
+  console.log(tempMatches)
+}
+
+function dupTest(){
+  console.log("");
+  console.log("__________________DUPLICATION TEST_______________________")
+  for(let j = 0; j < mentees.length; j++){
+    let testMentee = mentees[j].name;
+    let occurances = [];
+
+    for(let q = 0; q < mentors.length; q++){
+      let testMentor = mentors[q].name; 
+      for(item of tempMatches[testMentor]){
+        if(item === testMentee){
+          occurances.push(testMentor);
+        }
+      }
+    }
+    
+    if(occurances.length > 0){
+      let preference;
+      let x = unpairedMentees.indexOf(testMentee);
+      // unpairedMentees.splice(x, 1);
+      (x >= 0) ? unpairedMentees.splice(x, 1) : false;
+
+      console.info(testMentee+" occurs "+occurances.length+" times, in the list of "+occurances+". Splicing from Unpaired mentees");
+      
+      for(item2 of prefMentors[testMentee]){
+        // console.log("---DEBUG---"+item2, testMentee)
+        for(let q = 0; q < occurances.length; q++){
+          if(item2 == occurances[q]){
+            preference = item2;
+            // console.info("---WORKING--- "+preference, prefMentors[testMentee]);
+            occurances.splice(q, 1);
+            break;
+          } else { 
+            // console.log("---DEBUG---"+item2, occurances[q], prefMentors[testMentee])
+            }
+        }
+        if(preference != undefined){ break }
+      }
+        
+        console.info(testMentee+" would prefer "+preference+" as their mentor. Removing from all other tempMatches and menteeRankings and adding to pairedMentees list.")
+        pairedMentees.push(testMentee);
+        mentees[mentees.indexOf(mentees.find(({name}) => name == testMentee))].mentor = preference; // assign mentor to this mentees[].mentor
+
+        for(item of mentors){
+          let killObject = item.menteeRanking.find(({name}) => name === testMentee);
+          let killIndex = item.menteeRanking.indexOf(killObject);
+          item.menteeRanking.splice(killIndex, 1);
+          // console.log(killObject, killIndex);
+          // console.log(item.menteeRanking)
+        }
+        if(occurances.length > 0){
+          for(let q = occurances.length-1; q >= 0; q--){
+            let killIndex = tempMatches[occurances[q]].indexOf(testMentee);
+
+            tempMatches[occurances[q]].splice(killIndex, 1);
+          }
+        }
+    } else {
+      console.info("     "+testMentee+" doesn't occur on anyone's list");
+      let x = unpairedMentees.indexOf(testMentee);
+      if(x < 0){
+        unpairedMentees.push(testMentee);
+        console.log("         adding "+testMentee+" to unpaired mentees: "+unpairedMentees)
+      } 
+
+    }
+  }
+  
+}
+function checkMatches(){
+  for (let i = 0; i < mentees.length; i++){
+      mentees[i].mentorRanking = topMentor(mentees[i]);
+    }
+    for (let i = 0; i < mentors.length; i++){
+      mentors[i].menteeRanking = topMentee(mentors[i]);
+    }
+}
+
+function topMentee(tor){
+  let menteeRanking = [];
+  let p = tor.interests.length;
+  for(let i = 0; i < mentees.length; i++){
+    let numMatches = matchTest(mentees[i], tor);
+    let p2 = mentees[i].interests.length;
+    let mPot1 = numMatches / p;
+    let mPot2 = (numMatches + numMatches) / (p + p2) * 100;
+
+    menteeRanking.push({
+      name : mentees[i].name,
+      numMatches : numMatches,
+      rating : mPot2.toFixed(0),
+    })
+  }
+
+  menteeRanking.sort(function(a,b){return Number(b.rating) - Number(a.rating)});
+  
+  
+  console.info(tor.name+"'s mentee ranking: ");
+  console.info(menteeRanking);
+  return menteeRanking;
+}
+
+function topMentor(tee){
+  let p = tee.interests.length;
+  let mentorRanking = [];
+
+  for(let i = 0; i < mentors.length; i++){
+    let p2 = mentors[i].interests.length;
+    let numMatches = matchTest(tee, mentors[i]);
+    let mPot1 = numMatches / p;
+    let mPot2 = (numMatches + numMatches) / (p + p2) * 100;
+
+    mentorRanking.push({
+      name : mentors[i].name,
+      numMatches : numMatches,
+      rating : mPot2.toFixed(0),
+    })
+  }
+
+  mentorRanking.sort(function(a,b){return Number(b.rating) - Number(a.rating)});
+    
+
+  console.info(tee.name+"'s mentor ranking: ");
+  console.info(mentorRanking);
+  return mentorRanking;
+}
+
+function matchTest(tee, tor){
+  int1 = tee.interests;
+  int2 = tor.interests;
+
+  let numMatches = 0;
+  let matches = [];
+
+  for(let i = 0; i < int1.length; i++){
+    for(let j = i; j < int2.length; j++){
+      if(int1[i] == int2[j]){
+        numMatches ++;
+        matches.push(int1[i]);
+      }
+    }
+  }
+
+  // console.info(tee.name+" and "+tor.name+" have "+numMatches+" matches:");
+  // console.info(matches);
+
+  return numMatches
+}
+
+function importData() {
+  var people = sheet.getRange(2,3,numP,7).getValues();
+  // console.log(people)
+  
+  for (let i = 0; i < people.length; i ++){
+    if(people[i][1] == 'First Year (Mentee)' || people[i][1] == 'Second Year (Mentee)'){
+      mentees.push({
+        name: people[i][0],
+        pronouns: people[i][3],
+        email: people[i][4],
+        phone: people[i][5],
+        year: people[i][1],
+        interests: people[i][2].split(', '),
+        mentorRanking: [],
+        mentor: "",
+      });
+      unpairedMentees.push(people[i][0]); // add to unpaired mentees list
+      let l = mentees.length - 1;
+      console.log(mentees[l].name+" ("+mentees[l].pronouns+")\rCONTACT INFO: "+mentees[l].email+" ("+mentees[l].phone+")");
+    } else if(people[i][1] == 'Third Year (Mentor)' || people[i][1] == 'Fourth Year (Mentor)'){
+      mentors.push({
+        name: people[i][0],
+        pronouns: people[i][3],
+        email: people[i][4],
+        phone: people[i][5],
+        year: people[i][1],
+        interests: people[i][2].split(', '),
+        menteeRanking : [],
+        mentees: [],
+        numMentees: people[i][6],
+      });
+      let l = mentors.length - 1;
+      console.log(mentors[l].name+" ("+mentors[l].pronouns+")\rCONTACT INFO: "+mentors[l].email+" ("+mentors[l].phone+")");
+
+    }
+  } /// Loop through people[] and assign each object to mentees[] or mentors[] 
+    // console.log(unpairedMentees);
+    // console.log(mentors);
+    
+
+  
+}
+
+
+/////////////////////////////// OUT OF USE FUNCTIONS //////////////////////////////////////
+
+
+function matchAlg1(){
+  for(let i = 0; i < mentors.length; i++){
+    mentors[i].mentees.push(mentors[i].menteeRanking[0].name);
+    let menteeName = mentors[i].menteeRanking[0].name;
+    console.info(menteeName+" has been assigned to "+mentors[i].name)
+
+    for(let j = 0; j < mentors.length; j++){
+     for(let q = 0; q < mentors[j].menteeRanking.length; q++){
+      
+      if(menteeName == mentors[j].menteeRanking[q].name){
+        mentors[j].menteeRanking.splice(q,1);
+      }
+     }
+     if(mentors[j].menteeRanking.length < 1){
+       return ;
+     }
+    }
+
+    if(i == mentors.length-1){ i = -1;}
+  }
+}
+
+function rankSort(a, b){
+  if(Number(a.rating) > Number(b.rating)){return -1}
+  if(Number(a.rating) < Number(b.rating)){return 1}
+  if(Number(a.rating) == Number(b.rating)){return 0}
+}
